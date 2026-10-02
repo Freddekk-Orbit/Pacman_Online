@@ -1,29 +1,57 @@
 # Pacman Online
 
-An 8-bit arcade cabinet you can host for friends. One player is Pac-Man, the others are ghosts — picked at random or claimed in the lobby before the round starts.
+An 8-bit arcade cabinet you can host for friends **anywhere in the world**. One player is Pac-Man, the others are ghosts — picked at random or claimed in the lobby before the round starts.
 
-## Play
+## Play worldwide
+
+Friends do **not** need your LAN IP. They open the same website and use your 4-letter code, or click an invite link:
+
+`https://YOUR-SERVER/?join=A7K2`
+
+### Option A — Deploy the cabinet (best)
+
+Push this repo to [Render](https://render.com) (this repo includes `render.yaml`) or any host that can run Node 20+:
+
+```bash
+npm ci
+npm run build
+npm start
+```
+
+Set `PUBLIC_URL=https://your-app.onrender.com` if the host does not send `X-Forwarded-Host`. Then send friends that URL.
+
+Docker:
+
+```bash
+docker build -t pacman-online .
+docker run -p 3000:3000 -e PUBLIC_URL=https://your.domain pacman-online
+```
+
+### Option B — Instant public tunnel from your PC
+
+```bash
+npm install
+npm run world
+```
+
+That builds the game, starts the server, and opens a Cloudflare quick tunnel. Share the printed `https://….trycloudflare.com` link. Anyone on the internet can join rooms on your machine.
+
+### Option C — Local / LAN only
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`.
+Open `http://localhost:5173`. LAN friends can still use your local IP if you are on the same network.
 
-- **Create Server** opens a private room and shows a 4-letter code plus LAN addresses.
-- **Join Friend** uses that code. If your friend is running their own machine, put their host (`192.168.x.x:3000`) in Server Host.
-- **Play Solo** is local Pac-Man against four AI ghosts.
-- **Settings** change name, palettes (arcade, amber CRT, green phosphor, neon, cotton candy, mono), wall/Pac-Man colors, scanlines, glow, pixel scale, and volume.
+## In-game
 
-Production (one port, shareable with friends on your network):
-
-```bash
-npm run build
-npm start
-```
-
-Then open `http://YOUR_LAN_IP:3000`.
+- **Create Server** — room code + copyable worldwide invite. Optionally list it in the World Lobby.
+- **Join Friend** — enter the code. Custom host is only for a different cabinet.
+- **World Lobby** — sit down at any listed public room on this server.
+- **Play Solo** — local Pac-Man vs four AI ghosts.
+- **Settings** — name, palettes, colors, scanlines, glow, scale, volume.
 
 ## Controls
 

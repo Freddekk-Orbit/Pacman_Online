@@ -24,7 +24,7 @@
             <h1 class="logo">
               <span class="logo-p">PAC</span><span class="logo-m">MAN</span>
             </h1>
-            <p class="sub">ONLINE ARCADE · 8-BIT CABINET</p>
+            <p class="sub">ONLINE WORLDWIDE · 8-BIT CABINET</p>
             <div class="ghost-row" aria-hidden="true">
               <span class="pix-ghost g blinky"></span>
               <span class="pix-ghost g pinky"></span>
@@ -34,6 +34,7 @@
             <nav class="menu" id="title-menu">
               <button data-go="host">CREATE SERVER</button>
               <button data-go="join">JOIN FRIEND</button>
+              <button data-go="world">WORLD LOBBY</button>
               <button data-go="solo">PLAY SOLO</button>
               <button data-go="settings">SETTINGS</button>
             </nav>
@@ -83,11 +84,12 @@
 
           <div id="screen-host" class="screen hidden">
             <h2>CREATE SERVER</h2>
-            <p class="sub">Host a private cabinet. Friends join with your code.</p>
+            <p class="sub">Friends anywhere join with your code or invite link. No IP needed.</p>
             <form id="host-form" class="panel">
               <label>SERVER NAME
                 <input id="host-name" maxlength="18" value="MY CABINET" />
               </label>
+              <label class="check"><input type="checkbox" id="host-listed" checked /> LIST IN WORLD LOBBY</label>
               <label>ROLE ASSIGNMENT
                 <select id="host-assign">
                   <option value="random">RANDOM AT START</option>
@@ -120,7 +122,7 @@
 
           <div id="screen-join" class="screen hidden">
             <h2>JOIN FRIEND</h2>
-            <p class="sub">Enter their room code. For a personal server, also set the host.</p>
+            <p class="sub">Same worldwide cabinet — enter the 4-letter code. That is enough.</p>
             <form id="join-form" class="panel">
               <label>YOUR NAME
                 <input id="join-name" maxlength="14" />
@@ -128,14 +130,28 @@
               <label>ROOM CODE
                 <input id="join-code" maxlength="6" class="code" placeholder="A7K2" autocapitalize="characters" />
               </label>
-              <label>SERVER HOST
-                <input id="join-host" placeholder="localhost:3000" />
-              </label>
+              <details class="advanced">
+                <summary>CUSTOM SERVER</summary>
+                <label>CABINET HOST
+                  <input id="join-host" placeholder="game.example.com" />
+                </label>
+              </details>
               <div class="row">
                 <button type="submit">INSERT COIN</button>
                 <button type="button" data-go="title">BACK</button>
               </div>
             </form>
+          </div>
+
+          <div id="screen-world" class="screen hidden">
+            <h2>WORLD LOBBY</h2>
+            <p class="sub">Open cabinets on this server. Anyone worldwide can sit down.</p>
+            <ul id="world-rooms" class="world-list"></ul>
+            <div class="row">
+              <button type="button" id="world-refresh">REFRESH</button>
+              <button type="button" data-go="join">HAVE A CODE</button>
+              <button type="button" data-go="title">BACK</button>
+            </div>
           </div>
 
           <div id="screen-lobby" class="screen hidden">
@@ -146,11 +162,15 @@
                 <p id="lobby-code" class="big-code">----</p>
               </div>
               <div>
-                <p class="tiny">FRIENDS JOIN AT</p>
+                <p class="tiny">WORLD INVITE</p>
                 <p id="lobby-url" class="join-url">—</p>
               </div>
             </div>
             <p id="lobby-hints" class="hints"></p>
+            <div class="row">
+              <button type="button" id="lobby-copy">COPY INVITE LINK</button>
+            </div>
+            <label class="check lobby-list"><input type="checkbox" id="lobby-listed" /> LIST IN WORLD LOBBY</label>
             <div class="split">
               <div class="panel">
                 <h3>PLAYERS</h3>

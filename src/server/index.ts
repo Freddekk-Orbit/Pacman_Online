@@ -1,14 +1,16 @@
 import { existsSync } from "node:fs";
-import { createServer } from "node:http";
+import { createServer, type IncomingHttpHeaders } from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { WebSocketServer, type WebSocket } from "ws";
-import { MAX_ROOMS, ROOM_IDLE_MS } from "../shared/constants.ts";
+import { MAX_PLAYERS, MAX_ROOMS, ROOM_IDLE_MS } from "../shared/constants.ts";
 import type { ClientMsg } from "../shared/protocol.ts";
 import { DEFAULT_MATCH, type MatchSettings } from "../shared/types.ts";
+import { inviteUrl, publicOrigin } from "./publicUrl.ts";
 import { Room, makeCode, makeId, sanitizeName, type Client } from "./room.ts";
+import { startWorldwideTunnel } from "./tunnel.ts";
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -16,9 +18,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const clientDir = join(__dirname, "../../dist/client");
 
 const app = express();
+app.set("trust proxy", true);
 app.use(express.json());
 
 const rooms = new Map<string, Room>();
+let tunnelUrl = "";
 
 function lanAddresses(): string[] {
   const out: string[] = [];
@@ -32,23 +36,46 @@ function lanAddresses(): string[] {
   return out;
 }
 
-function hostHints(reqHost?: string): string[] {
-  const port = PORT;
-  const hints = lanAddresses().map((ip) => `http://${ip}:${port}`);
-  if (reqHost) hints.unshift(`http://${reqHost}`);
+function originFrom(headers?: IncomingHttpHeaders): string {
+  return publicOrigin({
+    headers,
+    tunnelUrl,
+    port: PORT,
+  });
+}
+
+function hostHints(headers?: IncomingHttpHeaders): string[] {
+  const origin = originFrom(headers);
+  const hints = [origin, ...lanAddresses().map((ip) => `http://${ip}:${PORT}`)];
   return [...new Set(hints)];
 }
 
 app.get("/api/health", (_req, res) => {
-  res.json({ ok: true, rooms: rooms.size });
+  res.json({ ok: true, rooms: rooms.size, worldwide: Boolean(tunnelUrl || process.env.PUBLIC_URL) });
 });
 
 app.get("/api/info", (req, res) => {
+  const origin = originFrom(req.headers);
   res.json({
     port: PORT,
     rooms: rooms.size,
-    hints: hostHints(req.headers.host),
+    publicUrl: origin,
+    worldwide: Boolean(tunnelUrl || process.env.PUBLIC_URL || req.headers["x-forwarded-host"]),
+    hints: hostHints(req.headers),
   });
+});
+
+app.get("/api/rooms", (_req, res) => {
+  const list = [...rooms.values()]
+    .filter((room) => room.listed && room.phase === "lobby")
+    .map((room) => ({
+      code: room.code,
+      name: room.name,
+      players: room.clients.size,
+      max: MAX_PLAYERS,
+      assignmentMode: room.settings.assignmentMode,
+    }));
+  res.json({ rooms: list });
 });
 
 app.get("/api/rooms/:code", (req, res) => {
@@ -60,21 +87,10 @@ app.get("/api/rooms/:code", (req, res) => {
   res.json({
     ok: true,
     code: room.code,
+    name: room.name,
     players: room.clients.size,
     phase: room.phase,
-  });
-});
-
-app.post("/api/rooms", (req, res) => {
-  if (rooms.size >= MAX_ROOMS) {
-    res.status(503).json({ error: "Too many rooms on this server." });
-    return;
-  }
-  const settings = { ...DEFAULT_MATCH, ...(req.body?.settings as MatchSettings | undefined) };
-  res.json({
-    ok: true,
-    settings,
-    hints: hostHints(req.headers.host),
+    listed: room.listed,
   });
 });
 
@@ -112,8 +128,8 @@ wss.on("connection", (ws, req) => {
 
     if (msg.type === "hello" && !room) {
       const name = sanitizeName(msg.name || "");
-      const hints = hostHints(req.headers.host);
-      const joinHost = req.headers.host || `localhost:${PORT}`;
+      const origin = originFrom(req.headers);
+      const hints = hostHints(req.headers);
 
       if (msg.create) {
         if (rooms.size >= MAX_ROOMS) {
@@ -130,9 +146,10 @@ wss.on("connection", (ws, req) => {
           ready: false,
           lastInput: "none",
         };
-        room = new Room(code, client, msg.settings);
+        room = new Room(code, client, msg.settings, { name: msg.roomName, listed: msg.listed });
+        room.inviteUrl = inviteUrl(origin, code);
         rooms.set(code, room);
-        room.handle(playerId, msg, hints, `http://${joinHost}`);
+        room.handle(playerId, msg, hints, room.inviteUrl);
         return;
       }
 
@@ -157,7 +174,8 @@ wss.on("connection", (ws, req) => {
         return;
       }
       room = found;
-      room.handle(playerId, { ...msg, roomCode: code }, hints, `http://${joinHost}`);
+      room.inviteUrl = inviteUrl(origin, code);
+      room.handle(playerId, { ...msg, roomCode: code }, hints, room.inviteUrl);
       return;
     }
 
@@ -165,7 +183,7 @@ wss.on("connection", (ws, req) => {
       send(ws, { type: "error", message: "Join or create a room first." });
       return;
     }
-    room.handle(playerId, msg, hostHints(req.headers.host), `http://${req.headers.host}`);
+    room.handle(playerId, msg, hostHints(req.headers), room.inviteUrl);
   });
 
   ws.on("close", () => {
@@ -189,8 +207,17 @@ setInterval(() => {
   }
 }, 30_000);
 
-server.listen(PORT, HOST, () => {
-  const hints = lanAddresses();
+server.listen(PORT, HOST, async () => {
   console.log(`PACMAN ONLINE listening on http://${HOST}:${PORT}`);
-  for (const ip of hints) console.log(`  LAN: http://${ip}:${PORT}`);
+  for (const ip of lanAddresses()) console.log(`  LAN: http://${ip}:${PORT}`);
+  if (process.env.WORLDWIDE === "1" || process.argv.includes("--world")) {
+    const url = await startWorldwideTunnel(PORT);
+    if (url) {
+      tunnelUrl = url;
+      console.log(`  WORLD: ${url}`);
+    } else {
+      console.log("  WORLD: tunnel failed — set PUBLIC_URL or deploy this server.");
+    }
+  }
+  if (process.env.PUBLIC_URL) console.log(`  PUBLIC: ${process.env.PUBLIC_URL}`);
 });

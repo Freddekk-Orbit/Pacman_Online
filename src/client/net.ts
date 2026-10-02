@@ -1,9 +1,11 @@
 import type { ClientMsg, ServerMsg } from "../shared/protocol.ts";
 
 function wsUrl(host: string): string {
-  const clean = host.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const raw = host.trim();
+  if (raw.startsWith("https://")) return `wss://${raw.slice(8).replace(/\/$/, "")}/ws`;
+  if (raw.startsWith("http://")) return `ws://${raw.slice(7).replace(/\/$/, "")}/ws`;
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  return `${proto}//${clean}/ws`;
+  return `${proto}//${raw.replace(/\/$/, "")}/ws`;
 }
 
 export class Net {
@@ -19,7 +21,7 @@ export class Net {
       const t = setTimeout(() => {
         reject(new Error("Connection timed out."));
         ws.close();
-      }, 6000);
+      }, 15000);
       ws.onopen = () => {
         clearTimeout(t);
         ws.send(JSON.stringify(hello));

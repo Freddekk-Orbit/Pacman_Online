@@ -26,6 +26,9 @@ export class Room {
   readonly createdAt = Date.now();
   hostId: string;
   settings: MatchSettings;
+  name: string;
+  listed: boolean;
+  inviteUrl = "";
   clients = new Map<string, Client>();
   phase: "lobby" | "playing" | "over" = "lobby";
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -33,10 +36,17 @@ export class Room {
   private state = createGameState(new Map(), DEFAULT_MATCH);
   lastActivity = Date.now();
 
-  constructor(code: string, host: Client, settings?: MatchSettings) {
+  constructor(
+    code: string,
+    host: Client,
+    settings?: MatchSettings,
+    opts?: { name?: string; listed?: boolean },
+  ) {
     this.code = code;
     this.hostId = host.id;
     this.settings = { ...DEFAULT_MATCH, ...settings };
+    this.name = sanitizeName(opts?.name || host.name).slice(0, 18) || "CABINET";
+    this.listed = opts?.listed !== false;
     this.clients.set(host.id, host);
   }
 
@@ -89,6 +99,12 @@ export class Room {
         this.settings = { ...this.settings, ...msg.settings };
         this.broadcastLobby();
         break;
+      case "set_room":
+        if (id !== this.hostId || this.phase !== "lobby") return;
+        if (typeof msg.listed === "boolean") this.listed = msg.listed;
+        if (msg.name) this.name = sanitizeName(msg.name).slice(0, 18) || this.name;
+        this.broadcastLobby();
+        break;
       case "ready":
         client.ready = msg.ready;
         this.broadcastLobby();
@@ -112,13 +128,17 @@ export class Room {
         break;
       }
       case "hello":
+        if (joinUrl) this.inviteUrl = joinUrl;
         this.send(client.ws, {
           type: "welcome",
           playerId: id,
           roomCode: this.code,
           isHost: id === this.hostId,
           joinUrl,
+          inviteUrl: this.inviteUrl || joinUrl,
           hostHints: hints,
+          listed: this.listed,
+          roomName: this.name,
         });
         this.broadcastLobby();
         if (this.phase === "playing") {
@@ -188,6 +208,9 @@ export class Room {
       players: this.lobbyPlayers(),
       settings: this.settings,
       hostId: this.hostId,
+      listed: this.listed,
+      roomName: this.name,
+      inviteUrl: this.inviteUrl,
     });
   }
 

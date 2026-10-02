@@ -10,6 +10,7 @@
     "dev:client": "vite",
     "build": "vite build",
     "start": "tsx src/server/index.ts",
+    "world": "npm run build && WORLDWIDE=1 tsx src/server/index.ts --world",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

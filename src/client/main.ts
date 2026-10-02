@@ -23,7 +23,7 @@ import {
   type LocalSettings,
 } from "./settings.ts";
 
-type Screen = "title" | "settings" | "host" | "join" | "lobby" | "game";
+type Screen = "title" | "settings" | "host" | "join" | "world" | "lobby" | "game";
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -36,6 +36,8 @@ let isHost = false;
 let roomCode = "";
 let joinHints: string[] = [];
 let joinUrl = "";
+let inviteUrl = "";
+let roomListed = true;
 let lobbyPlayers: LobbyPlayer[] = [];
 let match: MatchSettings = { ...DEFAULT_MATCH };
 let mode: "solo" | "online" = "solo";
@@ -51,21 +53,23 @@ let titleIndex = 0;
 
 function show(next: Screen): void {
   screen = next;
-  for (const id of ["title", "settings", "host", "join", "lobby", "game"]) {
+  for (const id of ["title", "settings", "host", "join", "world", "lobby", "game"]) {
     $("screen-" + id).classList.toggle("hidden", id !== next);
   }
   $("status-line").textContent =
     next === "title"
-      ? "CABINET READY · CREATE A SERVER FOR FRIENDS"
+      ? "WORLDWIDE CABINET · SHARE A CODE WITH ANYONE"
       : next === "lobby"
-        ? `ROOM ${roomCode} · SHARE THE CODE`
+        ? `ROOM ${roomCode} · SEND THE INVITE LINK`
         : next === "game"
           ? "ARROWS / WASD TO MOVE"
           : next === "settings"
             ? "PALETTES · SCANLINES · YOUR NAME"
             : next === "host"
-              ? "OPEN A PRIVATE ROOM FOR YOUR FRIENDS"
-              : "ENTER A ROOM CODE TO JOIN";
+              ? "OPEN A ROOM FRIENDS CAN JOIN FROM ANYWHERE"
+              : next === "world"
+                ? "PUBLIC ROOMS ON THIS SERVER"
+                : "ENTER A ROOM CODE TO JOIN FROM ANYWHERE";
 }
 
 function fillSettingsForm(): void {
@@ -227,8 +231,11 @@ function sfxFromState(s: GameState): void {
 
 function renderLobby(): void {
   $("lobby-code").textContent = roomCode;
-  $("lobby-url").textContent = joinUrl || defaultHost();
+  $("lobby-url").textContent = inviteUrl || joinUrl || defaultHost();
   $("lobby-hints").textContent = joinHints.join("  ·  ");
+  const listed = $("lobby-listed") as HTMLInputElement;
+  listed.checked = roomListed;
+  listed.disabled = !isHost;
   const list = $("lobby-players");
   list.innerHTML = lobbyPlayers
     .map((p) => {
@@ -262,7 +269,9 @@ function onServer(msg: ServerMsg): void {
     roomCode = msg.roomCode;
     isHost = msg.isHost;
     joinUrl = msg.joinUrl;
+    inviteUrl = msg.inviteUrl || msg.joinUrl;
     joinHints = msg.hostHints;
+    roomListed = msg.listed;
     show("lobby");
     return;
   }
@@ -270,6 +279,8 @@ function onServer(msg: ServerMsg): void {
     lobbyPlayers = msg.players;
     match = msg.settings;
     isHost = msg.hostId === playerId;
+    roomListed = msg.listed;
+    if (msg.inviteUrl) inviteUrl = msg.inviteUrl;
     if (screen !== "game") show("lobby");
     renderLobby();
     return;
@@ -320,6 +331,8 @@ async function createRoom(settings: MatchSettings): Promise<void> {
     name: local.name,
     create: true,
     settings,
+    roomName: ($("host-name") as HTMLInputElement).value,
+    listed: ($("host-listed") as HTMLInputElement).checked,
   });
 }
 
@@ -341,6 +354,7 @@ function leaveOnline(): void {
   stopLoop();
   state = null;
   roomCode = "";
+  inviteUrl = "";
   lobbyPlayers = [];
   show("title");
 }
@@ -359,6 +373,7 @@ function bindUi(): void {
         ($("join-name") as HTMLInputElement).value = local.name;
         ($("join-host") as HTMLInputElement).value = defaultHost();
       }
+      if (go === "world") void refreshWorldLobby();
       show(go);
     });
   });
@@ -422,6 +437,20 @@ function bindUi(): void {
   });
   $("lobby-start").addEventListener("click", () => net.send({ type: "start" }));
   $("lobby-leave").addEventListener("click", leaveOnline);
+  $("lobby-copy").addEventListener("click", async () => {
+    const link = inviteUrl || `${window.location.origin}/?join=${roomCode}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      $("status-line").textContent = "INVITE COPIED · SEND IT ANYWHERE";
+    } catch {
+      $("status-line").textContent = link;
+    }
+  });
+  $("lobby-listed").addEventListener("change", () => {
+    if (!isHost) return;
+    net.send({ type: "set_room", listed: ($("lobby-listed") as HTMLInputElement).checked });
+  });
+  $("world-refresh").addEventListener("click", () => void refreshWorldLobby());
 
   $("chat-form").addEventListener("submit", (e) => {
     e.preventDefault();
@@ -471,6 +500,41 @@ function bindUi(): void {
   }, 50);
 }
 
+async function refreshWorldLobby(): Promise<void> {
+  const list = $("world-rooms");
+  list.innerHTML = `<li class="empty-world">SCANNING CABINETS...</li>`;
+  try {
+    const res = await fetch("/api/rooms");
+    const data = (await res.json()) as {
+      rooms: Array<{ code: string; name: string; players: number; max: number; assignmentMode: string }>;
+    };
+    if (!data.rooms.length) {
+      list.innerHTML = `<li class="empty-world">NO OPEN WORLD GAMES. CREATE A SERVER AND SHARE THE LINK.</li>`;
+      return;
+    }
+    list.innerHTML = data.rooms
+      .map(
+        (r) =>
+          `<li><span>${escapeHtml(r.name)} · ${r.code} · ${r.players}/${r.max} · ${r.assignmentMode}</span><button type="button" data-join="${r.code}">SIT DOWN</button></li>`,
+      )
+      .join("");
+    list.querySelectorAll("[data-join]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const code = (btn as HTMLElement).dataset.join || "";
+        ($("join-code") as HTMLInputElement).value = code;
+        ($("join-name") as HTMLInputElement).value = local.name;
+        ($("join-host") as HTMLInputElement).value = defaultHost();
+        show("join");
+        void joinRoom(defaultHost(), code, local.name).catch((err) => {
+          $("status-line").textContent = err instanceof Error ? err.message : "JOIN FAILED";
+        });
+      });
+    });
+  } catch {
+    list.innerHTML = `<li class="empty-world">COULD NOT REACH THE WORLD SERVER.</li>`;
+  }
+}
+
 function boot(): void {
   audio.sfx = local.sfx;
   audio.music = local.music;
@@ -481,6 +545,17 @@ function boot(): void {
   bindUi();
   show("title");
   applyCanvasScale();
+  const join = new URLSearchParams(window.location.search).get("join") || new URLSearchParams(window.location.search).get("code");
+  if (join) {
+    ($("join-code") as HTMLInputElement).value = join.toUpperCase();
+    ($("join-name") as HTMLInputElement).value = local.name;
+    show("join");
+    if (local.name) {
+      void joinRoom(defaultHost(), join, local.name).catch((err) => {
+        $("status-line").textContent = err instanceof Error ? err.message : "JOIN FAILED";
+      });
+    }
+  }
 }
 
 boot();
