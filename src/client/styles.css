@@ -247,9 +247,21 @@ input.code {
 .ghost-row {
   display: flex;
   justify-content: center;
-  gap: 16px;
-  margin: 8px 0 4px;
-  font-size: 22px;
+  gap: 18px;
+  margin: 10px 0 6px;
+}
+
+.pix-ghost {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  box-shadow:
+    4px 0 0 currentColor, 8px 0 0 currentColor, 12px 0 0 currentColor,
+    0 4px 0 currentColor, 4px 4px 0 currentColor, 8px 4px 0 currentColor, 12px 4px 0 currentColor, 16px 4px 0 currentColor,
+    0 8px 0 currentColor, 16px 8px 0 currentColor,
+    0 12px 0 currentColor, 4px 12px 0 currentColor, 8px 12px 0 currentColor, 12px 12px 0 currentColor, 16px 12px 0 currentColor,
+    0 16px 0 currentColor, 8px 16px 0 currentColor, 16px 16px 0 currentColor;
+  transform: scale(1.15);
 }
 
 .g.blinky { color: var(--blinky); }
@@ -285,12 +297,13 @@ input.code {
 }
 
 #lobby-players li {
-  font-size: 10px;
+  font-size: 8px;
   padding: 8px 0;
   border-bottom: 2px solid #222;
   display: flex;
   justify-content: space-between;
   gap: 8px;
+  line-height: 1.5;
 }
 
 .code-banner {
@@ -350,8 +363,9 @@ input.code {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
   background: #000;
-  width: min(100%, 672px);
-  height: auto;
+  height: min(640px, 70vh);
+  width: auto;
+  max-width: 100%;
 }
 
 #game-overlay {

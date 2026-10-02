@@ -61,7 +61,11 @@ function show(next: Screen): void {
         ? `ROOM ${roomCode} · SHARE THE CODE`
         : next === "game"
           ? "ARROWS / WASD TO MOVE"
-          : "PRESS START 2P ENERGY";
+          : next === "settings"
+            ? "PALETTES · SCANLINES · YOUR NAME"
+            : next === "host"
+              ? "OPEN A PRIVATE ROOM FOR YOUR FRIENDS"
+              : "ENTER A ROOM CODE TO JOIN";
 }
 
 function fillSettingsForm(): void {
@@ -89,16 +93,25 @@ function paintSwatches(): void {
 
 function readSettingsForm(): void {
   local.name = ($("set-name") as HTMLInputElement).value.trim() || "PLAYER";
-  local.graphics.paletteId = ($("set-palette") as HTMLSelectElement).value;
+  const paletteId = ($("set-palette") as HTMLSelectElement).value;
+  const paletteChanged = paletteId !== local.graphics.paletteId;
+  local.graphics.paletteId = paletteId;
   local.graphics.scanlines = ($("set-scan") as HTMLInputElement).checked;
   local.graphics.crtGlow = ($("set-glow") as HTMLInputElement).checked;
   local.graphics.shake = ($("set-shake") as HTMLInputElement).checked;
   const scale = ($("set-scale") as HTMLSelectElement).value;
   local.graphics.pixelScale = scale === "auto" ? "auto" : (Number(scale) as 2 | 3 | 4 | 5);
-  local.graphics.custom = {
-    wall: ($("set-wall") as HTMLInputElement).value,
-    pac: ($("set-pac") as HTMLInputElement).value,
-  };
+  if (paletteChanged) {
+    local.graphics.custom = {};
+    const fresh = activePalette(local);
+    ($("set-wall") as HTMLInputElement).value = fresh.wall;
+    ($("set-pac") as HTMLInputElement).value = fresh.pac;
+  } else {
+    local.graphics.custom = {
+      wall: ($("set-wall") as HTMLInputElement).value,
+      pac: ($("set-pac") as HTMLInputElement).value,
+    };
+  }
   local.sfx = Number(($("set-sfx") as HTMLInputElement).value) / 100;
   local.music = Number(($("set-music") as HTMLInputElement).value) / 100;
   audio.sfx = local.sfx;
@@ -114,9 +127,11 @@ function applyCanvasScale(): void {
   canvas.height = VIEW_H;
   const scale = local.graphics.pixelScale;
   if (scale === "auto") {
-    canvas.style.width = "min(100%, 672px)";
+    canvas.style.height = "min(640px, 70vh)";
+    canvas.style.width = "auto";
   } else {
-    canvas.style.width = `${VIEW_W * scale}px`;
+    canvas.style.height = `${VIEW_H * scale}px`;
+    canvas.style.width = "auto";
   }
 }
 

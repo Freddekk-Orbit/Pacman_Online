@@ -101,28 +101,52 @@ function drawGhost(ctx: CanvasRenderingContext2D, e: Entity, palette: Palette, t
   ]);
 }
 
+function wallAt(maze: MazeData, x: number, y: number): boolean {
+  if (y < 0 || y >= maze.rows || x < 0 || x >= maze.cols) return false;
+  return maze.cells[y][x] === "wall";
+}
+
+function hLine(ctx: CanvasRenderingContext2D, x: number, y: number, w: number): void {
+  ctx.fillRect(x, y, w, 1);
+}
+
+function vLine(ctx: CanvasRenderingContext2D, x: number, y: number, h: number): void {
+  ctx.fillRect(x, y, 1, h);
+}
+
 function drawWalls(ctx: CanvasRenderingContext2D, maze: MazeData, palette: Palette): void {
+  ctx.fillStyle = palette.wall;
   for (let y = 0; y < maze.rows; y++) {
     for (let x = 0; x < maze.cols; x++) {
       const c = maze.cells[y][x];
       const ox = x * TILE;
       const oy = HUD + y * TILE;
-      if (c === "wall") {
-        ctx.fillStyle = palette.wall;
-        ctx.fillRect(ox + 1, oy + 1, TILE - 2, TILE - 2);
-        const up = y > 0 && maze.cells[y - 1][x] === "wall";
-        const dn = y < maze.rows - 1 && maze.cells[y + 1][x] === "wall";
-        const lf = x > 0 && maze.cells[y][x - 1] === "wall";
-        const rt = x < maze.cols - 1 && maze.cells[y][x + 1] === "wall";
-        if (up) ctx.fillRect(ox + 1, oy, TILE - 2, 2);
-        if (dn) ctx.fillRect(ox + 1, oy + TILE - 2, TILE - 2, 2);
-        if (lf) ctx.fillRect(ox, oy + 1, 2, TILE - 2);
-        if (rt) ctx.fillRect(ox + TILE - 2, oy + 1, 2, TILE - 2);
-        ctx.fillStyle = palette.wallInner;
-        ctx.fillRect(ox + 3, oy + 3, 2, 2);
-      } else if (c === "gate") {
+      if (c === "gate") {
         ctx.fillStyle = palette.gate;
         ctx.fillRect(ox, oy + 3, TILE, 2);
+        ctx.fillStyle = palette.wall;
+        continue;
+      }
+      if (c !== "wall") continue;
+      const up = wallAt(maze, x, y - 1);
+      const dn = wallAt(maze, x, y + 1);
+      const lf = wallAt(maze, x - 1, y);
+      const rt = wallAt(maze, x + 1, y);
+      if (!up) {
+        hLine(ctx, ox + (lf ? 0 : 1), oy + 1, TILE - (lf ? 0 : 1) - (rt ? 0 : 1));
+        hLine(ctx, ox + (lf ? 0 : 2), oy + 2, TILE - (lf ? 0 : 2) - (rt ? 0 : 2));
+      }
+      if (!dn) {
+        hLine(ctx, ox + (lf ? 0 : 1), oy + TILE - 2, TILE - (lf ? 0 : 1) - (rt ? 0 : 1));
+        hLine(ctx, ox + (lf ? 0 : 2), oy + TILE - 3, TILE - (lf ? 0 : 2) - (rt ? 0 : 2));
+      }
+      if (!lf) {
+        vLine(ctx, ox + 1, oy + (up ? 0 : 1), TILE - (up ? 0 : 1) - (dn ? 0 : 1));
+        vLine(ctx, ox + 2, oy + (up ? 0 : 2), TILE - (up ? 0 : 2) - (dn ? 0 : 2));
+      }
+      if (!rt) {
+        vLine(ctx, ox + TILE - 2, oy + (up ? 0 : 1), TILE - (up ? 0 : 1) - (dn ? 0 : 1));
+        vLine(ctx, ox + TILE - 3, oy + (up ? 0 : 2), TILE - (up ? 0 : 2) - (dn ? 0 : 2));
       }
     }
   }
@@ -175,10 +199,10 @@ export function renderFrame(
   }
 
   ctx.fillStyle = palette.hud;
-  ctx.font = "8px monospace";
+  ctx.font = '6px "Press Start 2P", monospace';
   ctx.textBaseline = "top";
-  ctx.fillText(`1UP ${pad(state.score)}`, 8, 8);
-  ctx.fillText(`LEFT ${state.pelletsLeft}`, 96, 8);
+  ctx.fillText(`1UP ${pad(state.score)}`, 6, 8);
+  ctx.fillText(`DOTS ${state.pelletsLeft}`, 92, 8);
   let lx = VIEW_W - 8 - state.lives * 10;
   ctx.fillStyle = palette.pac;
   for (let i = 0; i < state.lives; i++) {
