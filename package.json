@@ -10,7 +10,9 @@
     "dev:client": "vite",
     "build": "vite build",
     "start": "tsx src/server/index.ts",
-    "world": "npm run build && WORLDWIDE=1 tsx src/server/index.ts --world",
+    "server": "node scripts/run-dedicated.mjs",
+    "server:public": "node scripts/run-dedicated.mjs --public",
+    "world": "npm run server:public",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

@@ -6,14 +6,14 @@ import { join } from "node:path";
 const CF_URLS: Record<string, string> = {
   "linux-x64": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64",
   "linux-arm64": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64",
-  "darwin-x64": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64.tgz",
-  "darwin-arm64": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64.tgz",
+  "win32-x64": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe",
+  "win32-arm64": "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe",
 };
 
 function platformKey(): string {
-  const os = process.platform === "darwin" ? "darwin" : process.platform === "linux" ? "linux" : "";
-  const arch = process.arch === "arm64" ? "arm64" : "x64";
-  return os ? `${os}-${arch}` : "";
+  if (process.platform === "win32") return process.arch === "arm64" ? "win32-arm64" : "win32-x64";
+  if (process.platform === "linux") return process.arch === "arm64" ? "linux-arm64" : "linux-x64";
+  return "";
 }
 
 async function resolveBinary(): Promise<string | null> {
@@ -21,12 +21,12 @@ async function resolveBinary(): Promise<string | null> {
     return process.env.CLOUDFLARED_BIN;
   }
   const cache = join(homedir(), ".cache", "pacman-online");
-  const cached = join(cache, "cloudflared");
+  const cached = join(cache, process.platform === "win32" ? "cloudflared.exe" : "cloudflared");
   if (existsSync(cached)) return cached;
 
   const key = platformKey();
   const url = CF_URLS[key];
-  if (!url || url.endsWith(".tgz")) return null;
+  if (!url) return null;
 
   try {
     mkdirSync(cache, { recursive: true });
