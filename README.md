@@ -2,6 +2,17 @@
 
 An 8-bit arcade cabinet you can host for friends **anywhere in the world**. One player is Pac-Man, the others are ghosts — picked at random or claimed in the lobby before the round starts.
 
+## 24/7 laptop host (you asked for this)
+
+The laptop **only runs the server**. You and friends **join from other computers**.
+
+```bash
+npm install
+npm run server:public
+```
+
+Leave that window open. On the laptop open `http://localhost:3000/console` (host dashboard, not for playing). Send friends the `WORLD PLAY` URL from the terminal or `server-url.txt`. Full walkthrough: [HOSTING.md](HOSTING.md).
+
 ## Play worldwide
 
 Friends do **not** need your LAN IP. They open the same website and use your 4-letter code, or click an invite link:

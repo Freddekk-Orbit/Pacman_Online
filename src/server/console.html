@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PACMAN CABINET HOST</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <style>
+      :root { --wall:#2121de; --pac:#ffff00; --text:#fff; --muted:#7b7bff; --hud:#ffb897; }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: #05050c;
+        color: var(--text);
+        font-family: "Press Start 2P", monospace;
+        padding: 24px 16px;
+      }
+      main { max-width: 760px; margin: 0 auto; }
+      h1 { color: var(--pac); font-size: 18px; letter-spacing: 2px; }
+      h2 { color: var(--hud); font-size: 12px; }
+      p, li, td { font-size: 10px; line-height: 1.8; color: var(--muted); }
+      .panel { border: 3px solid var(--wall); padding: 16px; margin: 16px 0; background: #000; }
+      .url { color: var(--pac); font-size: 12px; word-break: break-all; }
+      button {
+        font-family: inherit; font-size: 10px; color: #fff;
+        background: #101018; border: 3px solid var(--wall); padding: 10px 12px; cursor: pointer;
+      }
+      button:hover { background: var(--wall); }
+      table { width: 100%; border-collapse: collapse; }
+      td, th { text-align: left; padding: 8px 4px; border-bottom: 2px solid #222; color: #fff; font-size: 9px; }
+      .ok { color: #66ff66; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>CABINET HOST</h1>
+      <p class="ok">This laptop is the server. Do not play here unless you want to.</p>
+      <p>Friends open the join URL on their own phones or PCs, then Create Server or Join Friend.</p>
+
+      <div class="panel">
+        <h2>FRIENDS OPEN THIS</h2>
+        <p id="join-url" class="url">loading...</p>
+        <p id="meta"></p>
+        <button type="button" id="copy">COPY JOIN URL</button>
+        <a href="/"><button type="button">PLAY ON THIS LAPTOP ANYWAY</button></a>
+      </div>
+
+      <div class="panel">
+        <h2>LIVE ROOMS</h2>
+        <table>
+          <thead><tr><th>CODE</th><th>NAME</th><th>PLAYERS</th><th>STATE</th></tr></thead>
+          <tbody id="rooms"><tr><td colspan="4">NONE YET</td></tr></tbody>
+        </table>
+      </div>
+    </main>
+    <script>
+      async function refresh() {
+        const info = await fetch("/api/info").then((r) => r.json());
+        const rooms = await fetch("/api/console").then((r) => r.json());
+        document.getElementById("join-url").textContent = info.publicUrl;
+        document.getElementById("meta").textContent =
+          "PORT " + info.port + " · " + info.rooms + " ROOM(S) · " + (info.worldwide ? "PUBLIC TUNNEL / URL ON" : "LAN OR SET PUBLIC_URL");
+        const body = document.getElementById("rooms");
+        if (!rooms.rooms.length) {
+          body.innerHTML = "<tr><td colspan='4'>NONE YET — A FRIEND MUST CREATE A SERVER FROM THE GAME</td></tr>";
+          return;
+        }
+        body.innerHTML = rooms.rooms.map((r) =>
+          "<tr><td>" + r.code + "</td><td>" + r.name + "</td><td>" + r.players + "</td><td>" + r.phase + (r.listed ? " · WORLD" : "") + "</td></tr>"
+        ).join("");
+      }
+      document.getElementById("copy").onclick = async () => {
+        const url = document.getElementById("join-url").textContent;
+        try { await navigator.clipboard.writeText(url); } catch {}
+        document.getElementById("copy").textContent = "COPIED";
+        setTimeout(() => document.getElementById("copy").textContent = "COPY JOIN URL", 1200);
+      };
+      refresh();
+      setInterval(refresh, 3000);
+    </script>
+  </body>
+</html>

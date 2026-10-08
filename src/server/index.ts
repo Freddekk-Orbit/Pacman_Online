@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { createServer, type IncomingHttpHeaders } from "node:http";
 import { networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
@@ -7,10 +7,12 @@ import express from "express";
 import { WebSocketServer, type WebSocket } from "ws";
 import { MAX_PLAYERS, MAX_ROOMS, ROOM_IDLE_MS } from "../shared/constants.ts";
 import type { ClientMsg } from "../shared/protocol.ts";
-import { DEFAULT_MATCH, type MatchSettings } from "../shared/types.ts";
 import { inviteUrl, publicOrigin } from "./publicUrl.ts";
+import { loadEnvFile } from "./loadEnv.ts";
 import { Room, makeCode, makeId, sanitizeName, type Client } from "./room.ts";
 import { startWorldwideTunnel } from "./tunnel.ts";
+
+loadEnvFile();
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || "0.0.0.0";
@@ -60,9 +62,27 @@ app.get("/api/info", (req, res) => {
     port: PORT,
     rooms: rooms.size,
     publicUrl: origin,
+    dedicated: true,
+    consoleUrl: `${origin}/console`,
     worldwide: Boolean(tunnelUrl || process.env.PUBLIC_URL || req.headers["x-forwarded-host"]),
     hints: hostHints(req.headers),
   });
+});
+
+app.get("/api/console", (_req, res) => {
+  res.json({
+    rooms: [...rooms.values()].map((room) => ({
+      code: room.code,
+      name: room.name,
+      players: room.clients.size,
+      phase: room.phase,
+      listed: room.listed,
+    })),
+  });
+});
+
+app.get("/console", (_req, res) => {
+  res.sendFile(join(__dirname, "console.html"));
 });
 
 app.get("/api/rooms", (_req, res) => {
@@ -97,7 +117,7 @@ app.get("/api/rooms/:code", (req, res) => {
 if (existsSync(clientDir)) {
   app.use(express.static(clientDir));
   app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api") || req.path.startsWith("/ws")) {
+    if (req.path.startsWith("/api") || req.path.startsWith("/ws") || req.path.startsWith("/console")) {
       next();
       return;
     }
@@ -207,17 +227,31 @@ setInterval(() => {
   }
 }, 30_000);
 
+function saveServerUrl(url: string): void {
+  try {
+    writeFileSync(join(__dirname, "../../server-url.txt"), `${url}\n`, "utf8");
+  } catch {
+    /* ignore */
+  }
+}
+
 server.listen(PORT, HOST, async () => {
-  console.log(`PACMAN ONLINE listening on http://${HOST}:${PORT}`);
-  for (const ip of lanAddresses()) console.log(`  LAN: http://${ip}:${PORT}`);
+  console.log(`PACMAN ONLINE dedicated cabinet on http://${HOST}:${PORT}`);
+  console.log(`  HOST CONSOLE: http://127.0.0.1:${PORT}/console`);
+  for (const ip of lanAddresses()) console.log(`  LAN PLAY: http://${ip}:${PORT}`);
   if (process.env.WORLDWIDE === "1" || process.argv.includes("--world")) {
     const url = await startWorldwideTunnel(PORT);
     if (url) {
       tunnelUrl = url;
-      console.log(`  WORLD: ${url}`);
+      saveServerUrl(url);
+      console.log(`  WORLD PLAY: ${url}`);
+      console.log(`  Friends open that URL on their own computers.`);
     } else {
-      console.log("  WORLD: tunnel failed — set PUBLIC_URL or deploy this server.");
+      console.log("  WORLD: tunnel failed — port-forward 3000 and set PUBLIC_URL in .env");
     }
   }
-  if (process.env.PUBLIC_URL) console.log(`  PUBLIC: ${process.env.PUBLIC_URL}`);
+  if (process.env.PUBLIC_URL) {
+    saveServerUrl(process.env.PUBLIC_URL);
+    console.log(`  PUBLIC: ${process.env.PUBLIC_URL}`);
+  }
 });
