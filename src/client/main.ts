@@ -11,7 +11,7 @@ import type {
 } from "../shared/types.ts";
 import { DEFAULT_MATCH } from "../shared/types.ts";
 import { audio } from "./audio.ts";
-import { Input } from "./input.ts";
+import { Input, isTypingTarget } from "./input.ts";
 import { Net, defaultHost } from "./net.ts";
 import { VIEW_H, VIEW_W, renderFrame } from "./render.ts";
 import {
@@ -485,6 +485,7 @@ function bindUi(): void {
       $("overlay-title").textContent = "PAUSED";
       $("overlay-sub").textContent = "QUIT RETURNS TO THE TITLE";
     }
+    if (isTypingTarget(e.target)) return;
     if (screen !== "title") return;
     const buttons = Array.from(document.querySelectorAll("#title-menu button")) as HTMLButtonElement[];
     if (e.key === "ArrowDown" || e.key === "s") titleIndex = (titleIndex + 1) % buttons.length;
