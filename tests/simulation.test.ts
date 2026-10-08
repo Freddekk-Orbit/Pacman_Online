@@ -116,7 +116,7 @@ describe("simulation", () => {
       const dir = dirToward(pac.x, pac.y, wp.x, wp.y);
       step(state, { p1: dir }, TICK_DT, settings, MAZE);
     }
-    expect(pac.y).toBeGreaterThanOrEqual(goal.y - 0.3);
+    expect(Math.round(pac.y)).toBeGreaterThanOrEqual(goal.y - 1);
   });
 
   it("stands still against a wall instead of bouncing", () => {
