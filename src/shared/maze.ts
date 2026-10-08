@@ -21,7 +21,7 @@ export const MAZE_SRC = [
   "XXXXX#.##..........##.#XXXXX",
   "XXXXX#.##.###--###.##.#XXXXX",
   "######.##.#HHHHHH#.##.######",
-  "      ....#G    G#....      ",
+  "      ....#GHHHHG#....      ",
   "######.##.#HHHHHH#.##.######",
   "XXXXX#.##.########.##.#XXXXX",
   "XXXXX#.##..........##.#XXXXX",
@@ -30,13 +30,13 @@ export const MAZE_SRC = [
   "#............##............#",
   "#.####.#####.##.#####.####.#",
   "#o####.#####.##.#####.####o#",
-  "#..##.........P........##..#",
-  "###.##.##.########.##.##.###",
-  "#....##.##.########.##.....#",
-  "#.####.##....##....##.####.#",
+  "#.####.#####.##.#####.####.#",
+  "#.............P............#",
+  "#.####.##.########.##.####.#",
+  "#.####.##.########.##.####.#",
+  "#......##....##....##......#",
   "#.####.#####.##.#####.####.#",
   "#............##............#",
-  "#.##########.##.##########.#",
   "############################",
 ] as const;
 
@@ -212,5 +212,35 @@ export function validateMaze(src: readonly string[] = MAZE_SRC): string[] {
     }
   }
   if (seen.size < 80) errors.push(`walkable flood fill too small: ${seen.size}`);
+
+  let walkable = 0;
+  for (let y = 0; y < parsed.rows; y++) {
+    for (let x = 0; x < parsed.cols; x++) {
+      if (!isBlocked(parsed, x, y, false)) walkable++;
+    }
+  }
+  if (seen.size !== walkable) {
+    errors.push(
+      `unreachable corridors: ${walkable - seen.size} walkable cells not reachable from spawn`,
+    );
+  }
+
+  const deadEnds: string[] = [];
+  for (let y = 0; y < parsed.rows; y++) {
+    for (let x = 0; x < parsed.cols; x++) {
+      if (isBlocked(parsed, x, y, false)) continue;
+      let n = 0;
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        if (!isBlocked(parsed, x + dx, y + dy, false)) n++;
+      }
+      if (n <= 1) deadEnds.push(`${x},${y}`);
+    }
+  }
+  if (deadEnds.length) errors.push(`dead-end corridors: ${deadEnds.join(" ")}`);
   return errors;
 }

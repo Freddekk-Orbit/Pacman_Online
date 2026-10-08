@@ -11,7 +11,7 @@ import type {
 } from "../shared/types.ts";
 import { DEFAULT_MATCH } from "../shared/types.ts";
 import { audio } from "./audio.ts";
-import { Input } from "./input.ts";
+import { Input, isTypingTarget } from "./input.ts";
 import { Net, defaultHost } from "./net.ts";
 import { VIEW_H, VIEW_W, renderFrame } from "./render.ts";
 import {
@@ -140,6 +140,7 @@ function applyCanvasScale(): void {
 }
 
 function startSolo(): void {
+  stopLoop();
   mode = "solo";
   roomCode = "";
   playerId = "local";
@@ -160,11 +161,21 @@ function startSolo(): void {
   lastTs = 0;
   show("game");
   applyCanvasScale();
+  grabPlayFocus();
   audio.startJingle();
   audio.startSiren();
   $("overlay-again").classList.add("hidden");
   $("game-overlay").classList.add("hidden");
   loop();
+}
+
+function grabPlayFocus(): void {
+  input.reset();
+  const active = document.activeElement;
+  if (active instanceof HTMLElement) active.blur();
+  const canvas = $("game") as HTMLCanvasElement;
+  canvas.tabIndex = 0;
+  canvas.focus({ preventScroll: true });
 }
 
 function stopLoop(): void {
@@ -202,8 +213,14 @@ function loop(): void {
       $("game-overlay").classList.remove("hidden");
       $("overlay-title").textContent = win ? "PELLETS CLEARED" : "GHOSTS WIN";
       $("overlay-sub").textContent = win ? "PAC-MAN CLEARS THE MAZE" : "THE PACK GOT THEIR MUNCHER";
-      $("overlay-again").classList.toggle("hidden", mode === "solo" || !isHost);
-      if (mode === "solo") audio.stopSiren();
+      if (mode === "solo") {
+        $("overlay-again").textContent = "PLAY AGAIN";
+        $("overlay-again").classList.remove("hidden");
+        audio.stopSiren();
+      } else {
+        $("overlay-again").textContent = "LOBBY";
+        $("overlay-again").classList.toggle("hidden", !isHost);
+      }
     }
   }
 }
@@ -294,6 +311,7 @@ function onServer(msg: ServerMsg): void {
     lastGhostsEaten = state.ghostsEatenStreak;
     show("game");
     applyCanvasScale();
+    grabPlayFocus();
     audio.startJingle();
     audio.startSiren();
     $("game-overlay").classList.add("hidden");
@@ -467,7 +485,13 @@ function bindUi(): void {
       show("title");
     }
   });
-  $("overlay-again").addEventListener("click", () => net.send({ type: "return_lobby" }));
+  $("overlay-again").addEventListener("click", () => {
+    if (mode === "solo") {
+      startSolo();
+      return;
+    }
+    net.send({ type: "return_lobby" });
+  });
 
   document.querySelectorAll("#dpad [data-dir]").forEach((btn) => {
     const send = (ev: Event) => {
@@ -485,6 +509,7 @@ function bindUi(): void {
       $("overlay-title").textContent = "PAUSED";
       $("overlay-sub").textContent = "QUIT RETURNS TO THE TITLE";
     }
+    if (isTypingTarget(e.target)) return;
     if (screen !== "title") return;
     const buttons = Array.from(document.querySelectorAll("#title-menu button")) as HTMLButtonElement[];
     if (e.key === "ArrowDown" || e.key === "s") titleIndex = (titleIndex + 1) % buttons.length;

@@ -182,8 +182,12 @@ function moveEntity(e: Entity, maze: MazeData, dt: number, ghostBase: number): v
     if (e.nextDir !== "none" && canLeave(maze, e, e.nextDir)) {
       e.dir = e.nextDir;
     } else if (e.dir === "none" || !canLeave(maze, e, e.dir)) {
-      const opens = neighborsOpen(maze, e.x, e.y, e.role !== "pacman");
-      e.dir = opens[0] ?? "none";
+      if (e.controlledBy) {
+        e.dir = "none";
+      } else {
+        const opens = neighborsOpen(maze, e.x, e.y, e.role !== "pacman");
+        e.dir = opens[0] ?? "none";
+      }
     }
   }
 
