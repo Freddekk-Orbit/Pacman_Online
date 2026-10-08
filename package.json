@@ -12,7 +12,7 @@
     "start": "tsx src/server/index.ts",
     "server": "node scripts/run-dedicated.mjs",
     "server:public": "node scripts/run-dedicated.mjs --public",
-    "world": "npm run server:public",
+    "world": "node scripts/run-dedicated.mjs --public",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

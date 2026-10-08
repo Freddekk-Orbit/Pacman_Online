@@ -92,6 +92,26 @@ To start automatically on login:
 
 ---
 
+## Windows: `'WORLDWIDE' is not recognized`
+
+That happens in Command Prompt if an old start line looks like `WORLDWIDE=1 tsx ...`. Windows thinks `WORLDWIDE` is a program name.
+
+Use one of these instead (in the project folder):
+
+```bat
+start-server-public.bat
+```
+
+or:
+
+```bat
+npm run server:public
+```
+
+Do not type `WORLDWIDE=1` in cmd.exe.
+
+---
+
 ## If friends cannot connect
 
 - The server window must still be running.

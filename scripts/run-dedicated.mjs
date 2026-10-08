@@ -1,26 +1,38 @@
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const publicMode = process.argv.includes("--public");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const tsxCli = join(root, "node_modules", "tsx", "dist", "cli.mjs");
+const npmCmd = process.platform === "win32" ? "npm.cmd" : "npm";
 
-function run(cmd, args, env = {}) {
+function run(command, args, useShell = false) {
   return new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, {
+    const child = spawn(command, args, {
+      cwd: root,
       stdio: "inherit",
-      shell: process.platform === "win32",
-      env: { ...process.env, ...env },
+      windowsHide: false,
+      env: process.env,
+      shell: useShell,
     });
     child.on("exit", (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`${cmd} exited ${code}`));
+      else reject(new Error(`${command} exited ${code ?? "null"}`));
     });
     child.on("error", reject);
   });
 }
 
-if (!existsSync("dist/client/index.html")) {
+if (!existsSync(join(root, "dist", "client", "index.html"))) {
   console.log("Building the game client once...");
-  await run("npm", ["run", "build"]);
+  await run(npmCmd, ["run", "build"], process.platform === "win32");
+}
+
+if (!existsSync(tsxCli)) {
+  console.error("tsx is missing. Run: npm install");
+  process.exit(1);
 }
 
 console.log("");
@@ -32,7 +44,6 @@ console.log(" Host console:  http://localhost:3000/console");
 console.log("==========================================");
 console.log("");
 
-const env = publicMode ? { WORLDWIDE: "1" } : {};
-const args = ["tsx", "src/server/index.ts"];
-if (publicMode) args.push("--world");
-await run("npx", args, env);
+const serverArgs = [tsxCli, "src/server/index.ts"];
+if (publicMode) serverArgs.push("--world");
+await run(process.execPath, serverArgs);
