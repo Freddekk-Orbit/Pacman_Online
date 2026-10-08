@@ -1,13 +1,21 @@
 import { dirFromKey } from "../shared/simulation.ts";
 import type { Dir } from "../shared/types.ts";
 
-/** True when a key event is aimed at a field that should receive letters as-is. */
+/** True when a key event is aimed at a visible field that should receive letters as-is. */
 export function isTypingTarget(target: EventTarget | null): boolean {
   if (!target || typeof target !== "object") return false;
-  const el = target as { tagName?: string; isContentEditable?: boolean };
+  const el = target as {
+    tagName?: string;
+    isContentEditable?: boolean;
+    disabled?: boolean;
+    closest?: (selector: string) => Element | null;
+  };
   const tag = String(el.tagName || "").toUpperCase();
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-  return Boolean(el.isContentEditable);
+  const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || Boolean(el.isContentEditable);
+  if (!typing) return false;
+  if (el.disabled) return false;
+  if (typeof el.closest === "function" && el.closest(".hidden")) return false;
+  return true;
 }
 
 export class Input {
@@ -44,5 +52,10 @@ export class Input {
 
   tap(dir: Dir): void {
     this.dir = dir;
+  }
+
+  reset(): void {
+    this.pressed.clear();
+    this.dir = "none";
   }
 }
